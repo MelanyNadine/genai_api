@@ -9,6 +9,7 @@ django = "*"
 djangorestframework = "*"
 google-api-python-client = "*"
 "google.cloud.storage" = "*"
+google-api-core = "*"
 
 [dev-packages]
 
