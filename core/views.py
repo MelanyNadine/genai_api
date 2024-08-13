@@ -8,6 +8,7 @@ from core.models import Files
 
 import google.generativeai as genai
 import pathlib
+from pypdf import PdfReader
 
 class ChatbotView(viewsets.ModelViewSet):
     queryset = Files.objects.all()
@@ -18,9 +19,17 @@ class ChatbotView(viewsets.ModelViewSet):
 
     def list(self, request):
         model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content("Write a story about a magic backpack.")
+        genai.configure(api_key="AIzaSyBxQN3piIIVdqA8Xzdpyq-kzARmn_WqrSU")
+        #response = model.generate_content("Write a story about a magic backpack.")
+        pdf_text = load_pdf(file_path="https://az184419.vo.msecnd.net/schneider-trucks/PDF/maintenance/TriPac-EVOLUTION-Operators-Manual-55711-19-OP-Rev.-0-06-13.pdf")
+        return Response({"response":pdf_text})
 
-        return Response({"response":response.text})
 
+    def load_pdf(file_path):
+        reader = PdfReader(file_path)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text()
+        return text
 
         

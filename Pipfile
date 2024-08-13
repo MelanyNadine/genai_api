@@ -10,6 +10,8 @@ djangorestframework = "*"
 google-api-python-client = "*"
 "google.cloud.storage" = "*"
 google-api-core = "*"
+"google.generativeai" = "*"
+pypdf = "*"
 
 [dev-packages]
 
