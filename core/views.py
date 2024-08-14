@@ -14,6 +14,7 @@ from urllib.request import urlopen
 import chromadb
 from chromadb import Documents, EmbeddingFunction, Embeddings
 from chromadb.utils import embedding_functions
+from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
 import io
 import re
 
@@ -30,7 +31,7 @@ class ChatbotView(viewsets.ModelViewSet):
         model = genai.GenerativeModel('gemini-1.5-flash')
         genai.configure(api_key="AIzaSyBxQN3piIIVdqA8Xzdpyq-kzARmn_WqrSU")
 
-        chroma_client = chromadb.PersistentClient(path="/home/devian/Projects/Work")
+        chroma_client = chromadb.PersistentClient(path='./')
         default_ef = embedding_functions.DefaultEmbeddingFunction()
 
         db = chroma_client.get_collection(name="DemoRag", embedding_function= default_ef)
@@ -67,7 +68,8 @@ class LoadRagView(viewsets.ModelViewSet):
         splitted_text = re.split('\n \n', pdf_text)
         chuncked_text = [i for i in splitted_text if i != ""]
 
-        chroma_client = chromadb.PersistentClient(path="/home/devian/Projects/Work")
+        chroma_client = chromadb.PersistentClient(path='./')
+        
         default_ef = embedding_functions.DefaultEmbeddingFunction()
 
         db = chroma_client.create_collection(name="DemoRag", embedding_function=default_ef)
@@ -76,7 +78,3 @@ class LoadRagView(viewsets.ModelViewSet):
             db.add(documents=document, ids=str(idx))
 
         return Response({"response": "rag has been loaded!"})
-        
-
-    
-        
