@@ -23,6 +23,7 @@ from chromadb.utils import embedding_functions
 from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
 import io
 import re
+import os
 
 class ChatbotView(viewsets.ModelViewSet):
     queryset = Files.objects.all()
@@ -96,7 +97,7 @@ class FileUploadView(viewsets.ModelViewSet):
         new_file.filedata = filedata
         new_file.save()
         if filedata:
-            default_storage.save("./files/"+filename, ContentFile(b''+bytes.fromhex(filedata)))
+            default_storage.save(os.getcwd()+"/files/"+filename, ContentFile(b''+bytes.fromhex(filedata)))
         
         return Response({"response": "File has been loaded!"})
 """
