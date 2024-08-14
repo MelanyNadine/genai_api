@@ -100,18 +100,13 @@ class FileUploadView(viewsets.ModelViewSet):
             default_storage.save("./"+filename, ContentFile(b''+bytes.fromhex(filedata)))
         
         return Response({"response": "File has been loaded!"})
-"""
+
 class FilesRetrievalView(viewsets.ModelViewSet):
     queryset = Files.objects.all()
     serializer_class = FilesSerializer
 
     def list(self, request):
-        filename = request.data.get('filename')
-        filedata = request.data.get('filedata')
-        new_file = Files(filename=filename)
-        new_file.filedata = filedata
-        new_file.save()
-        if filedata:
-            default_storage.save("./files/"+filename, ContentFile(b''+bytes.fromhex(filedata)))
-        
-        return Response({"response": "File has been loaded!"})"""
+        filespath = '/files/'
+        files = os.listdir(filespath)
+
+        return Response({"response": files})
