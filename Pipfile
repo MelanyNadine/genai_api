@@ -4,14 +4,12 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-google = "*"
 django = "*"
+google = "*"
 djangorestframework = "*"
-google-api-python-client = "*"
-"google.cloud.storage" = "*"
+pypdf = "*"
 google-api-core = "*"
 "google.generativeai" = "*"
-pypdf = "*"
 
 [dev-packages]
 
