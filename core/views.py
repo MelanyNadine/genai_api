@@ -11,29 +11,72 @@ import google.generativeai as genai
 import pathlib
 from pypdf import PdfReader
 from urllib.request import urlopen
-from pyPdf import PdfFileWriter, PdfFileReader
+import chromadb
+from chromadb import Documents, EmbeddingFunction, Embeddings
+from chromadb.utils import embedding_functions
+import io
+import re
 
 class ChatbotView(viewsets.ModelViewSet):
     queryset = Files.objects.all()
     serializer_class = FilesSerializer
-
-    # Log in to huggingface and grant authorization to huggingchat
-    
     
     def list(self, request):
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        return Response({"response":"Welcome to rag demo. Try doing a POST request with your query"})
+        
+
+    def create(self,request):
+        user_query = request.data.get('query')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         genai.configure(api_key="AIzaSyBxQN3piIIVdqA8Xzdpyq-kzARmn_WqrSU")
-        #response = model.generate_content("Write a story about a magic backpack.")
+
+        chroma_client = chromadb.PersistentClient(path="/home/devian/Projects/Work")
+        default_ef = embedding_functions.DefaultEmbeddingFunction()
+
+        db = chroma_client.get_collection(name="DemoRag", embedding_function= default_ef)
+
+        query = user_query
+        passage = db.query(query_texts=[query], n_results=5)['documents'][0]
+
+        prompt = f'''You are a helpful and informative bot that answers questions using text from the reference passage included below. Be sure to respond in a complete sentence, being comprehensive, including all relevant background information. If the passage is irrelevant to the answer, you may ignore it. \
+          QUESTION: "{query}"
+          PASSAGE: "{passage}"
+          '''
+        response = model.generate_content(prompt)
+
+        return Response({"response":response.text})
+
+
+class LoadRagView(viewsets.ModelViewSet):
+    queryset = Files.objects.all()
+    serializer_class = FilesSerializer
+
+    def list(self, request):
+        
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        genai.configure(api_key="AIzaSyBxQN3piIIVdqA8Xzdpyq-kzARmn_WqrSU")
+        
         remote_file = urlopen("https://web.stanford.edu/class/archive/cs/cs110/cs110.1214/static/lectures/cs110-lecture-17-mapreduce.pdf").read()
-        memory_file = StringIO(remoteFile)
-        pdf_file = PdfFileReader(memoryFile)
+        memory_file = io.BytesIO(remote_file)
+        pdf_file = PdfReader(memory_file)
         pdf_text = ""
+
         for page in pdf_file.pages:
             pdf_text += page.extract_text()
 
-        return Response({"response":pdf_text})
+        splitted_text = re.split('\n \n', pdf_text)
+        chuncked_text = [i for i in splitted_text if i != ""]
 
-    @api_view(['GET', 'POST'])
-    def post(self):
-        return 0
+        chroma_client = chromadb.PersistentClient(path="/home/devian/Projects/Work")
+        default_ef = embedding_functions.DefaultEmbeddingFunction()
+
+        db = chroma_client.create_collection(name="DemoRag", embedding_function=default_ef)
+        
+        for idx, document in enumerate(chuncked_text):
+            db.add(documents=document, ids=str(idx))
+
+        return Response({"response": "rag has been loaded!"})
+        
+
+    
         

@@ -17,10 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from core.views import ChatbotView
+from core.views import LoadRagView
 from rest_framework import routers
 
 router = routers.DefaultRouter()
 router.register(r'chat', ChatbotView, 'chat')
+router.register(r'rag', LoadRagView, 'init')
 
 urlpatterns = [
     path("admin/", admin.site.urls),
