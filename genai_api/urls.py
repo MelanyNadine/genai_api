@@ -18,13 +18,20 @@ from django.contrib import admin
 from django.urls import path, include
 from core.views import ChatbotView
 from core.views import LoadRagView
+from core.views import FileUploadView
 from rest_framework import routers
+from django.conf import settings
+from django.conf.urls.static import static
 
 router = routers.DefaultRouter()
 router.register(r'chat', ChatbotView, 'chat')
 router.register(r'rag', LoadRagView, 'init')
+router.register(r'file-upload', FileUploadView, 'fileupload')
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path('api/', include(router.urls))
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
