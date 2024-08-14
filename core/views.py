@@ -106,7 +106,7 @@ class FilesRetrievalView(viewsets.ModelViewSet):
     serializer_class = FilesSerializer
 
     def list(self, request):
-        filespath = '/files/'
+        filespath = './files/'
         files = os.listdir(filespath)
 
         return Response({"response": files})
