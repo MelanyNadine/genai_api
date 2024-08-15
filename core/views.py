@@ -46,12 +46,15 @@ class ChatbotView(viewsets.ModelViewSet):
         for file in os.listdir('./files'):
             filename = file.split('.')[0]
             collection_name = filename.replace(" ","")
+    
+            if self.collection_does_not_exists(collection_name):
+                continue
+
             collection = chroma_client.get_collection(name=collection_name)
-            if collection:
-                collection_query = collection.query(query_texts=[filename], n_results=5)['documents'][0]
+            collection_query = collection.query(query_texts=[filename], n_results=5)['documents'][0]
                 
-                if collection_query:
-                    info_sources.append({"file": file, "info": collection_query})
+            if collection_query:
+                info_sources.append({"file": file, "info": collection_query})
 
         prompt = f'''You are an assistant bot that answers questions using text from the source information
         included below. You are allowed to obtain information only from the source information here specified.
@@ -63,6 +66,15 @@ class ChatbotView(viewsets.ModelViewSet):
         response = model.generate_content(prompt)
 
         return Response({"response":response.text})
+
+    def collection_does_not_exists(self,  collection_name):
+        chroma_client = chromadb.PersistentClient(path='./')
+        default_ef = embedding_functions.DefaultEmbeddingFunction()
+        try:
+            collection = chroma_client.get_collection(name=collection_name, embedding_function= default_ef)
+            return False
+        except:
+            return True
 
 
 class LoadRagView(viewsets.ModelViewSet):
