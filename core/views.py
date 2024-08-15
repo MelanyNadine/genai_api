@@ -41,15 +41,25 @@ class ChatbotView(viewsets.ModelViewSet):
         chroma_client = chromadb.PersistentClient(path='./')
         default_ef = embedding_functions.DefaultEmbeddingFunction()
 
-        db = chroma_client.get_collection(name="DemoRag", embedding_function= default_ef)
+        info_sources = []
 
-        query = user_query
-        passage = db.query(query_texts=[query], n_results=5)['documents'][0]
+        for file in os.listdir('./files'):
+            filename = file.split('.')[0]
+            collection_name = filename.replace(" ","")
+            collection = chroma_client.get_collection(name=collection_name)
+            if collection:
+                collection_query = collection.query(query_texts=[filename], n_results=5)['documents'][0]
+                
+                if collection_query:
+                    info_sources.append({"file": file, "info": collection_query})
 
-        prompt = f'''You are a helpful and informative bot that answers questions using text from the reference passage included below. Be sure to respond in a complete sentence, being comprehensive, including all relevant background information. If the passage is irrelevant to the answer, you may ignore it. \
-          QUESTION: "{query}"
-          PASSAGE: "{passage}"
-          '''
+        prompt = f'''You are an assistant bot that answers questions using text from the source information
+        included below. You are allowed to obtain information only from the source information here specified.
+        If the source information is irrelevant to the answer, you may ignore it. Include in the answer the name
+        of the file from which you obtained the information.\
+        QUESTION: {user_query}
+        SOURCE INFORMATION: {str(info_sources)}
+        '''
         response = model.generate_content(prompt)
 
         return Response({"response":response.text})
@@ -60,31 +70,63 @@ class LoadRagView(viewsets.ModelViewSet):
     serializer_class = FilesSerializer
 
     def list(self, request):
+        chroma_client = chromadb.PersistentClient(path='./')
+        default_ef = embedding_functions.DefaultEmbeddingFunction()
         
+        for file in os.listdir('./files'):
+            if self.collection_already_exists(file):
+                continue
+            else:
+                self.create_collection_from_file(file)
+        #"Collections have been created/updated!"
+        return Response({"response": "Collections have been created/updated!"})
+
+    def collection_already_exists(self, filename):
+        chroma_client = chromadb.PersistentClient(path='./')
+        default_ef = embedding_functions.DefaultEmbeddingFunction()
+        collection_name = filename.split('.')[0].replace(" ","")
+        try:
+            collection = chroma_client.get_collection(name=collection_name, embedding_function= default_ef)
+            return True
+        except:
+            return False
+        
+
+    def create_collection_from_file(self, filename):
         model = genai.GenerativeModel('gemini-1.5-flash')
         genai.configure(api_key="AIzaSyBxQN3piIIVdqA8Xzdpyq-kzARmn_WqrSU")
-        
-        remote_file = urlopen("https://web.stanford.edu/class/archive/cs/cs110/cs110.1214/static/lectures/cs110-lecture-17-mapreduce.pdf").read()
-        memory_file = io.BytesIO(remote_file)
-        pdf_file = PdfReader(memory_file)
-        pdf_text = ""
+        chroma_client = chromadb.PersistentClient(path='./')
+        default_ef = embedding_functions.DefaultEmbeddingFunction()
 
-        for page in pdf_file.pages:
-            pdf_text += page.extract_text()
+        collection_name = filename.split('.')[0].replace(" ","")
+        file_ext = filename.split('.')[1]
+        collection_text = ""
 
-        splitted_text = re.split('\n \n', pdf_text)
+        if file_ext=='pdf':
+            pdf_file = PdfReader('./files/'+filename)
+            for page in pdf_file.pages:
+                collection_text += page.extract_text()
+        elif file_ext=='txt':
+            collection_text
+
+        splitted_text = re.split('\n \n', collection_text)
         chuncked_text = [i for i in splitted_text if i != ""]
 
         chroma_client = chromadb.PersistentClient(path='./')
         
         default_ef = embedding_functions.DefaultEmbeddingFunction()
 
-        db = chroma_client.create_collection(name="DemoRag", embedding_function=default_ef)
+        db = chroma_client.create_collection(name=collection_name, embedding_function=default_ef)
         
         for idx, document in enumerate(chuncked_text):
             db.add(documents=document, ids=str(idx))
 
-        return Response({"response": "rag has been loaded!"})
+        return 'success' if db else 'failed'
+
+    def get_pdf_by_url(self, url):
+        remote_file = urlopen(url).read()
+        memory_file = io.BytesIO(remote_file)
+        return memory_file
 
 class FileUploadView(viewsets.ModelViewSet):
     queryset = Files.objects.all()
