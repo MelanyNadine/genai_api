@@ -31,7 +31,9 @@ class ChatbotView(viewsets.ModelViewSet):
     
     def list(self, request):
         return Response({"response":"Welcome to rag demo. Try doing a POST request with your query"})
-        
+    
+    def get_collection_name(self, filename):
+        return re.sub(r'[^\w\s]', '', filename.replace(" ",""))
 
     def create(self,request):
         user_query = request.data.get('query')
@@ -45,7 +47,7 @@ class ChatbotView(viewsets.ModelViewSet):
 
         for file in os.listdir('./files'):
             filename = file.split('.')[0]
-            collection_name = filename.replace(" ","")
+            collection_name = self.get_collection_name(filename)
     
             if self.collection_does_not_exists(collection_name):
                 continue
@@ -93,10 +95,13 @@ class LoadRagView(viewsets.ModelViewSet):
         #"Collections have been created/updated!"
         return Response({"response": "Collections have been created/updated!"})
 
+    def get_collection_name(self, filename):
+        return re.sub(r'[^\w\s]', '', filename.replace(" ",""))
+
     def collection_already_exists(self, filename):
         chroma_client = chromadb.PersistentClient(path='./')
         default_ef = embedding_functions.DefaultEmbeddingFunction()
-        collection_name = filename.split('.')[0].replace(" ","")
+        collection_name = self.get_collection_name(filename)
         try:
             collection = chroma_client.get_collection(name=collection_name, embedding_function= default_ef)
             return True
@@ -110,7 +115,7 @@ class LoadRagView(viewsets.ModelViewSet):
         chroma_client = chromadb.PersistentClient(path='./')
         default_ef = embedding_functions.DefaultEmbeddingFunction()
 
-        collection_name = filename.split('.')[0].replace(" ","")
+        collection_name = self.get_collection_name(filename)
         file_ext = filename.split('.')[1]
         collection_text = ""
 
