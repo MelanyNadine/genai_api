@@ -48,15 +48,16 @@ class ChatbotView(viewsets.ModelViewSet):
         for file in os.listdir('./files'):
             filename = file.split('.')[0]
             collection_name = self.get_collection_name(filename)
-    
+
             if self.collection_does_not_exists(collection_name):
                 continue
 
-            collection = chroma_client.get_collection(name=collection_name)
-            collection_query = collection.query(query_texts=[filename], n_results=5)['documents'][0]
+            collection = chroma_client.get_collection(name=collection_name, embedding_function=default_ef)
+            collection_documents = collection.get()['documents']
+            collection_text = '*NEW_DOC*'.join(collection_documents)
                 
-            if collection_query:
-                info_sources.append({"file": file, "info": collection_query})
+            if collection_text:
+                info_sources.append({"file": file, "info": collection_text})
 
         prompt = f'''You are an assistant bot that answers questions using text from the source information
         included below. You are allowed to obtain information only from the source information here specified.
@@ -86,15 +87,16 @@ class LoadRagView(viewsets.ModelViewSet):
     def list(self, request):
         chroma_client = chromadb.PersistentClient(path='./')
         default_ef = embedding_functions.DefaultEmbeddingFunction()
-        
+
         for file in os.listdir('./files'):
             filename = file.split('.')[0]
             collection_name = self.get_collection_name(filename)
+    
             if self.collection_already_exists(collection_name):
                 continue
             else:
                 self.create_collection_from_file(file)
-   
+                
         return Response({"response": "Collections have been created/updated!"})
 
     def get_collection_name(self, filename):
@@ -104,12 +106,11 @@ class LoadRagView(viewsets.ModelViewSet):
         chroma_client = chromadb.PersistentClient(path='./')
         default_ef = embedding_functions.DefaultEmbeddingFunction()
         try:
-            chroma_client.get_collection(name=collection_name, embedding_function= default_ef)
+            collection = chroma_client.get_collection(name=collection_name, embedding_function= default_ef)
             return True
         except:
             return False
         
-
     def create_collection_from_file(self, file):
         chroma_client = chromadb.PersistentClient(path='./')
         default_ef = embedding_functions.DefaultEmbeddingFunction()
@@ -123,22 +124,21 @@ class LoadRagView(viewsets.ModelViewSet):
             pdf_file = PdfReader('./files/'+file)
             for page in pdf_file.pages:
                 collection_text += page.extract_text()
-        elif file_ext=='txt':
-            collection_text
+        """elif file_ext=='txt':
+            collection_text"""
 
         splitted_text = re.split('\n \n', collection_text)
-        chuncked_text = [i for i in splitted_text if i != ""]
+        chuncked_text = [textline for textline in splitted_text if textline != "" or textline != " "]
 
         chroma_client = chromadb.PersistentClient(path='./')
         
         default_ef = embedding_functions.DefaultEmbeddingFunction()
 
-        db = chroma_client.create_collection(name=collection_name, embedding_function=default_ef)
-        
-        for idx, document in enumerate(chuncked_text):
-            db.add(documents=document, ids=str(idx))
-
-        return 'success' if db else 'failed'
+        if chuncked_text:
+            collection = chroma_client.create_collection(name=collection_name, embedding_function=default_ef)
+            
+            for i, textline in enumerate(chuncked_text):
+                collection.add(documents=textline, ids=str(i)) 
 
     def get_pdf_by_url(self, url):
         remote_file = urlopen(url).read()
