@@ -88,39 +88,39 @@ class LoadRagView(viewsets.ModelViewSet):
         default_ef = embedding_functions.DefaultEmbeddingFunction()
         
         for file in os.listdir('./files'):
-            if self.collection_already_exists(file):
+            filename = file.split('.')[0]
+            collection_name = self.get_collection_name(filename)
+            if self.collection_already_exists(collection_name):
                 continue
             else:
                 self.create_collection_from_file(file)
-        #"Collections have been created/updated!"
+   
         return Response({"response": "Collections have been created/updated!"})
 
     def get_collection_name(self, filename):
         return re.sub(r'[^\w\s]', '', filename.replace(" ",""))
 
-    def collection_already_exists(self, filename):
+    def collection_already_exists(self, collection_name):
         chroma_client = chromadb.PersistentClient(path='./')
         default_ef = embedding_functions.DefaultEmbeddingFunction()
-        collection_name = self.get_collection_name(filename)
         try:
-            collection = chroma_client.get_collection(name=collection_name, embedding_function= default_ef)
+            chroma_client.get_collection(name=collection_name, embedding_function= default_ef)
             return True
         except:
             return False
         
 
-    def create_collection_from_file(self, filename):
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        genai.configure(api_key="AIzaSyBxQN3piIIVdqA8Xzdpyq-kzARmn_WqrSU")
+    def create_collection_from_file(self, file):
         chroma_client = chromadb.PersistentClient(path='./')
         default_ef = embedding_functions.DefaultEmbeddingFunction()
 
+        filename = file.split('.')[0]
+        file_ext = file.split('.')[1]
         collection_name = self.get_collection_name(filename)
-        file_ext = filename.split('.')[1]
         collection_text = ""
 
         if file_ext=='pdf':
-            pdf_file = PdfReader('./files/'+filename)
+            pdf_file = PdfReader('./files/'+file)
             for page in pdf_file.pages:
                 collection_text += page.extract_text()
         elif file_ext=='txt':
