@@ -196,7 +196,7 @@ class MergeFilesView(viewsets.ModelViewSet):
                   merged_pdfs_text += f'TITLE: {filename} \t FILE: {file} \n '
                   merged_pdfs_text += page.extract_text() + '\n'
 
-        with open('./mergedFiles/secondtest_xd.txt', 'w') as file:
+        with open('./files/mergedFiles/secondtest_xd.txt', 'w') as file:
             file.write(merged_pdfs_text)
             file.close()
 
