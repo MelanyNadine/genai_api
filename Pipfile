@@ -41,6 +41,8 @@ typing-extensions = "==4.12.2"
 uritemplate = "==4.1.1"
 urllib3 = "==2.2.2"
 chromadb = "*"
+transformers = "*"
+torch = "*"
 
 [dev-packages]
 

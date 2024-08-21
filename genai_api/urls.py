@@ -21,6 +21,7 @@ from core.views import LoadRagView
 from core.views import FileUploadView
 from core.views import FilesRetrievalView
 from core.views import MergeFilesView
+from core.views import AskPurelyLlamaView
 from rest_framework import routers
 from django.conf import settings
 from django.conf.urls.static import static
@@ -31,6 +32,7 @@ router.register(r'rag', LoadRagView, 'init')
 router.register(r'file-upload', FileUploadView, 'fileupload')
 router.register(r'get-files', FilesRetrievalView, 'getfiles')
 router.register(r'make-merged_file', MergeFilesView, 'makemergedfile')
+router.register(r'ask-llama', AskPurelyLlamaView, 'askLlama')
 
 urlpatterns = [
     path("admin/", admin.site.urls),

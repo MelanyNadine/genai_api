@@ -25,6 +25,9 @@ import io
 import re
 import os
 import itertools
+import transformers
+import torch
+from huggingface_hub import login
 
 class ChatbotView(viewsets.ModelViewSet):
     queryset = Files.objects.all()
@@ -201,3 +204,34 @@ class MergeFilesView(viewsets.ModelViewSet):
             file.close()
 
         return Response({"response":"File has been created!"})
+
+
+class AskPurelyLlamaView(viewsets.ModelViewSet):
+    queryset = Files.objects.all()
+    serializer_class = FilesSerializer
+
+    def list(self, request):
+        model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+
+        login(token = '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')
+
+        pipeline = transformers.pipeline(
+            "text-generation",
+            model=model_id,
+            model_kwargs={"torch_dtype": torch.bfloat16},
+            device_map="auto",
+        )
+
+        messages = [
+            {"role": "system", "content": "You are an assistant bot"},
+            {"role": "user", "content": "Who are you?"},
+        ]
+
+        outputs = pipeline(
+            messages,
+            max_new_tokens=256,
+        )
+
+        bot_response = outputs[0]["generated_text"][-1]
+
+        return bot_response
