@@ -24,6 +24,7 @@ from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
 import io
 import re
 import os
+import itertools
 
 class ChatbotView(viewsets.ModelViewSet):
     queryset = Files.objects.all()
@@ -169,3 +170,34 @@ class FilesRetrievalView(viewsets.ModelViewSet):
         files = os.listdir(filespath)
 
         return Response({"response": files})
+
+class MergeFilesView(viewsets.ModelViewSet):
+    queryset = Files.objects.all()
+    serializer_class = FilesSerializer
+
+    def list(self, request):
+        filespath = './files/'
+        files = os.listdir(filespath)
+
+        merged_pdfs_text = '''You are an assistant bot that answers questions using text from the source information
+        included below. You are allowed to obtain information only from the source information here specified.
+        If the source information is irrelevant to the answer, you may ignore it. Include in the answer the name
+        of the file from which you obtained the information.\
+        '''
+        
+        files = os.listdir('./files')
+      
+        for file in files:
+            pdf_file = PdfReader('./files/'+file)
+            for page in pdf_file.pages:
+              filename = file.split('.')[0]
+              file_ext = file.split('.')[1]
+              if file_ext=='pdf':
+                  merged_pdfs_text += f'TITLE: {filename} \t FILE: {file} \n '
+                  merged_pdfs_text += page.extract_text() + '\n'
+
+        with open('./mergedFiles/secondtest_xd.txt', 'w') as file:
+            file.write(merged_pdfs_text)
+            file.close()
+
+        return Response({"response":"File has been created!"})

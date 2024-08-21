@@ -20,6 +20,7 @@ from core.views import ChatbotView
 from core.views import LoadRagView
 from core.views import FileUploadView
 from core.views import FilesRetrievalView
+from core.views import MergeFilesView
 from rest_framework import routers
 from django.conf import settings
 from django.conf.urls.static import static
@@ -29,6 +30,7 @@ router.register(r'chat', ChatbotView, 'chat')
 router.register(r'rag', LoadRagView, 'init')
 router.register(r'file-upload', FileUploadView, 'fileupload')
 router.register(r'get-files', FilesRetrievalView, 'getfiles')
+router.register(r'make-merged_file', MergeFilesView, 'makemergedfile')
 
 urlpatterns = [
     path("admin/", admin.site.urls),
