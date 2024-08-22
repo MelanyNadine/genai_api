@@ -41,8 +41,7 @@ class ChatbotView(viewsets.ModelViewSet):
 
     def create(self,request):
         user_query = request.data.get('query')
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        genai.configure(api_key="AIzaSyBxQN3piIIVdqA8Xzdpyq-kzARmn_WqrSU")
+        
 
         chroma_client = chromadb.PersistentClient(path='./')
         default_ef = embedding_functions.DefaultEmbeddingFunction()
@@ -70,7 +69,15 @@ class ChatbotView(viewsets.ModelViewSet):
         QUESTION: {user_query}
         SOURCE INFORMATION: {str(info_sources)}
         '''
-        response = model.generate_content(prompt)
+
+        try:
+            model = genai.GenerativeModel('gemini-1.5-pro')
+            genai.configure(api_key="AIzaSyB8Lf8mzpR67zzrphItIUuYO-MBUjbMc6o")
+            response = model.generate_content(prompt)
+        except:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            genai.configure(api_key="AIzaSyB8Lf8mzpR67zzrphItIUuYO-MBUjbMc6o")
+            response = model.generate_content(prompt)
 
         return Response({"response":response.text})
 
