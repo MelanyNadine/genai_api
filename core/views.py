@@ -72,7 +72,7 @@ class ChatbotView(viewsets.ModelViewSet):
 
         try:
             model = genai.GenerativeModel('gemini-1.5-pro')
-            genai.configure(api_key="AIzaSyB8Lf8mzpR67zzrphItIUuYO-MBUjbMc6o")
+            genai.configure(api_key="AIzaSyDDAtCKGoHdxc3sFTAxVhYLRfFLHif70bU")
             response = model.generate_content(prompt)
         except:
             model = genai.GenerativeModel('gemini-1.5-flash')
