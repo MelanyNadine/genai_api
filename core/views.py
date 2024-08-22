@@ -72,16 +72,13 @@ class ChatbotView(viewsets.ModelViewSet):
 
         try:
             model = genai.GenerativeModel('gemini-1.5-pro')
-            genai.configure(api_key="AIzaSyDDAtCKGoHdxc3sFTAxVhYLRfFLHif70bU")
+            genai.configure(api_key="AIzaSyCxaDP_yOp01ZccgrmogeCsQ3tiV3kmWiU")
+            response = model.generate_content(prompt)
         except:
-            try:
-                model = genai.GenerativeModel('gemini-1.5-pro')
-                genai.configure(api_key="AIzaSyCxaDP_yOp01ZccgrmogeCsQ3tiV3kmWiU")
-            except:
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                genai.configure(api_key="AIzaSyB8Lf8mzpR67zzrphItIUuYO-MBUjbMc6o")
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            genai.configure(api_key="AIzaSyCxaDP_yOp01ZccgrmogeCsQ3tiV3kmWiU")
+            response = model.generate_content(prompt)
                 
-        response = model.generate_content(prompt)
         return Response({"response":response.text})
 
     def collection_does_not_exists(self,  collection_name):
