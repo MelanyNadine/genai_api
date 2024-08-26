@@ -12,7 +12,6 @@ from core.models import Files
 from pathlib import Path
 from core.forms import UploadFileForm
 
-
 import google.generativeai as genai
 from vertexai.preview.generative_models import GenerativeModel, GenerationConfig, Part, Content
 import pathlib
@@ -48,9 +47,11 @@ class ChatbotView(viewsets.ModelViewSet):
         user_query = request.data.get('query')
         chroma_client = chromadb.PersistentClient(path='./')
         default_ef = embedding_functions.DefaultEmbeddingFunction()
-        genai.configure(api_key=os.environ.get('GEMINI_API_KEY'))
 
-        info_sources = []
+        load_dotenv()
+        genai.configure(api_key=os.environ.get('GOOGLE_API_KEY'))
+
+        info_source = ''
 
         for file in os.listdir('./files'):
             filename = file.split('.')[0]
@@ -64,7 +65,7 @@ class ChatbotView(viewsets.ModelViewSet):
             collection_text = '*NEW_DOC*'.join(collection_documents)
                 
             if collection_text:
-                info_sources.append({"file": file, "info": collection_text})
+                info_source  += f'DOCUMENT TITLE: {file} \n DOCUMENT CONTENT: {collection_text}\n'
 
         cache = caching.CachedContent.create(
             model='models/gemini-1.5-flash-001',
@@ -74,7 +75,7 @@ class ChatbotView(viewsets.ModelViewSet):
                 'You are allowed to obtain information only from the source information here specified;'
                 'Include in the answer the name of the file from which you obtained the information.'
             ),
-            contents=[str(info_sources)],
+            contents=[info_source],
             ttl=datetime.timedelta(minutes=10),
         )
 
