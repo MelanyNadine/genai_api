@@ -33,12 +33,16 @@ import datetime
 import base64
 from dotenv import load_dotenv
 
+CACHE_ID = [1]
+
 class ChatbotView(viewsets.ModelViewSet):
     queryset = Files.objects.all()
     serializer_class = FilesSerializer
     
     def list(self, request):
-        return Response({"response":"Welcome to rag demo. Try doing a POST request with your query"})
+        cache_data = [c for c in caching.CachedContent.list()]
+        return Response({"response": str(cache_data)})
+        #return Response({"response":"Welcome to rag demo. Try doing a POST request with your query"})
     
     def get_collection_name(self, filename):
         return re.sub(r'[^\w\s]', '', filename.replace(" ",""))
@@ -50,36 +54,15 @@ class ChatbotView(viewsets.ModelViewSet):
 
         load_dotenv()
         genai.configure(api_key=os.environ.get('GOOGLE_API_KEY'))
+        
+        cache_id = CACHE_ID[0]
 
-        info_source = ''
+        try:
+            cached_context = caching.CachedContent.get(name=cache_id)
+        except:
+            return Response({"response": "Cache has expired. Reload it!"})
 
-        for file in os.listdir('./files'):
-            filename = file.split('.')[0]
-            try:
-                collection_name = self.get_collection_name(filename)
-            except:
-                continue
-
-            collection = chroma_client.get_collection(name=collection_name, embedding_function=default_ef)
-            collection_documents = collection.get()['documents']
-            collection_text = '*NEW_DOC*'.join(collection_documents)
-                
-            if collection_text:
-                info_source  += f'DOCUMENT TITLE: {file} \n DOCUMENT CONTENT: {collection_text}\n'
-
-        cache = caching.CachedContent.create(
-            model='models/gemini-1.5-flash-001',
-            display_name='manuals test',
-            system_instruction=(
-                'You are an assistant bot that answers questions using text from the source information provided.'
-                'You are allowed to obtain information only from the source information here specified;'
-                'Include in the answer the name of the file from which you obtained the information.'
-            ),
-            contents=[info_source],
-            ttl=datetime.timedelta(minutes=10),
-        )
-
-        model = genai.GenerativeModel.from_cached_content(cached_content=cache)
+        model = genai.GenerativeModel.from_cached_content(cached_content=cached_context)
         response = model.generate_content(user_query)
                 
         return Response({"response":response.text})
@@ -102,7 +85,43 @@ class LoadRagView(viewsets.ModelViewSet):
             else:
                 self.create_collection_from_file(file)
 
-        return Response({"response": "Collections have been uploaded/updated"})
+        info_source = ''
+
+        for file in os.listdir('./files'):
+            filename = file.split('.')[0]
+            try:
+                collection_name = self.get_collection_name(filename)
+            except:
+                continue
+
+            collection = chroma_client.get_collection(name=collection_name, embedding_function=default_ef)
+            collection_documents = collection.get()['documents']
+            collection_text = '*NEW_DOC*'.join(collection_documents)
+                
+            if collection_text:
+                info_source  += f'DOCUMENT TITLE: {file} \n DOCUMENT CONTENT: {collection_text}\n'
+        
+        cache_limit = 5 #minutes
+
+        cache = caching.CachedContent.create(
+            model='models/gemini-1.5-flash-001',
+            display_name='manuals test',
+            system_instruction=(
+                'You are an assistant bot that answers questions using text from the source information provided.'
+                'You are allowed to obtain information only from the source information here specified;'
+                'Include in the answer the name of the file from which you obtained the information.'
+            ),
+            contents=[info_source],
+            ttl=datetime.timedelta(minutes=cache_limit),
+        )
+
+        CACHE_ID[0] = cache.name
+
+        return Response({
+            "response": "Collections and Cached Context have been uploaded/updated", 
+            "cache_id": CACHE_ID[0], 
+            "cache_duration": f'{cache_limit} minutes'
+        })
 
     def get_collection_name(self, filename):
         return re.sub(r'[^\w\s]', '', filename.replace(" ",""))
@@ -150,6 +169,45 @@ class LoadRagView(viewsets.ModelViewSet):
         memory_file = io.BytesIO(remote_file)
         return memory_file
 
+class chatWithEmbeddingsView(viewsets.ModelViewSet):
+    queryset = Files.objects.all()
+    serializer_class = FilesSerializer
+
+    def create(self, request):
+        load_dotenv()
+
+        chroma_client = chromadb.PersistentClient(path='./')
+        embedding_function = embedding_functions.GoogleGenerativeAIEmbeddingFunction(
+            api_key=os.environ.get('GOOGLE_API_KEY'), task_type="RETRIEVAL_QUERY"
+        )
+        genai.configure(api_key=os.environ.get('GOOGLE_API_KEY'))
+
+        user_query = request.data.get('query')
+        info_source = ''
+        
+        for file in os.listdir('./files'):
+            filename = file.split('.')[0]
+            try:
+                collection_name = self.get_collection_name(filename)
+            except:
+                continue
+
+            collection = chroma_client.get_collection(name=collection_name, embedding_function=embedding_function)
+            info_source += collection.query(query_texts=[user_query], n_results=4, include=["documents", "metadatas"])
+        
+        prompt = f'''You are an assistant bot that answers questions using text from the source information provided. 
+            You are allowed to obtain information only from the source information here specified. Include in the 
+            answer the name of the file from which you obtained the information. \
+            QUESTION: {user_query}
+            SOURCE INFORMATION: {info_source}
+        '''
+
+        return Response({"response":info_source})
+        model = genai.GenerativeModel.from_cached_content(cached_content=cached_context)
+        response = model.generate_content(user_query)
+                
+        return Response({"response":response.text})
+
 class FileUploadView(viewsets.ModelViewSet):
     queryset = Files.objects.all()
     serializer_class = FilesSerializer
@@ -175,36 +233,6 @@ class FilesRetrievalView(viewsets.ModelViewSet):
 
         return Response({"response": files})
 
-class MergeFilesView(viewsets.ModelViewSet):
-    queryset = Files.objects.all()
-    serializer_class = FilesSerializer
-
-    def list(self, request):
-        filespath = './files/'
-        files = os.listdir(filespath)
-
-        merged_pdfs_text = '''You are an assistant bot that answers questions using text from the source information
-        included below. You are allowed to obtain information only from the source information here specified.
-        If the source information is irrelevant to the answer, you may ignore it. Include in the answer the name
-        of the file from which you obtained the information.\
-        '''
-        
-        files = os.listdir('./files')
-      
-        for file in files:
-            pdf_file = PdfReader('./files/'+file)
-            for page in pdf_file.pages:
-              filename = file.split('.')[0]
-              file_ext = file.split('.')[1]
-              if file_ext=='pdf':
-                  merged_pdfs_text += f'TITLE: {filename} \t FILE: {file} \n '
-                  merged_pdfs_text += page.extract_text() + '\n'
-
-        with open('./files/mergedFiles/secondtest_xd.txt', 'w') as file:
-            file.write(merged_pdfs_text)
-            file.close()
-
-        return Response({"response":"File has been created!"})
 
 
 class AskPurelyLlamaView(viewsets.ModelViewSet):
