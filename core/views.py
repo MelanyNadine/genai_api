@@ -14,6 +14,7 @@ from core.forms import UploadFileForm
 
 
 import google.generativeai as genai
+from vertexai.preview.generative_models import GenerativeModel, GenerationConfig, Part, Content
 import pathlib
 from pypdf import PdfReader
 from urllib.request import urlopen
@@ -28,6 +29,10 @@ import itertools
 import transformers
 import torch
 from huggingface_hub import login
+from google.generativeai import caching
+import datetime
+import base64
+from dotenv import load_dotenv
 
 class ChatbotView(viewsets.ModelViewSet):
     queryset = Files.objects.all()
@@ -41,18 +46,17 @@ class ChatbotView(viewsets.ModelViewSet):
 
     def create(self,request):
         user_query = request.data.get('query')
-        
-
         chroma_client = chromadb.PersistentClient(path='./')
         default_ef = embedding_functions.DefaultEmbeddingFunction()
+        genai.configure(api_key=os.environ.get('GEMINI_API_KEY'))
 
         info_sources = []
 
         for file in os.listdir('./files'):
             filename = file.split('.')[0]
-            collection_name = self.get_collection_name(filename)
-
-            if self.collection_does_not_exists(collection_name):
+            try:
+                collection_name = self.get_collection_name(filename)
+            except:
                 continue
 
             collection = chroma_client.get_collection(name=collection_name, embedding_function=default_ef)
@@ -62,33 +66,22 @@ class ChatbotView(viewsets.ModelViewSet):
             if collection_text:
                 info_sources.append({"file": file, "info": collection_text})
 
-        prompt = f'''You are an assistant bot that answers questions using text from the source information
-        included below. You are allowed to obtain information only from the source information here specified.
-        If the source information is irrelevant to the answer, you may ignore it. Include in the answer the name
-        of the file from which you obtained the information.\
-        QUESTION: {user_query}
-        SOURCE INFORMATION: {str(info_sources)}
-        '''
+        cache = caching.CachedContent.create(
+            model='models/gemini-1.5-flash-001',
+            display_name='manuals test',
+            system_instruction=(
+                'You are an assistant bot that answers questions using text from the source information provided.'
+                'You are allowed to obtain information only from the source information here specified;'
+                'Include in the answer the name of the file from which you obtained the information.'
+            ),
+            contents=[str(info_sources)],
+            ttl=datetime.timedelta(minutes=10),
+        )
 
-        try:
-            model = genai.GenerativeModel('gemini-1.5-pro')
-            genai.configure(api_key="AIzaSyCxaDP_yOp01ZccgrmogeCsQ3tiV3kmWiU")
-            response = model.generate_content(prompt)
-        except:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            genai.configure(api_key="AIzaSyCxaDP_yOp01ZccgrmogeCsQ3tiV3kmWiU")
-            response = model.generate_content(prompt)
+        model = genai.GenerativeModel.from_cached_content(cached_content=cache)
+        response = model.generate_content(user_query)
                 
         return Response({"response":response.text})
-
-    def collection_does_not_exists(self,  collection_name):
-        chroma_client = chromadb.PersistentClient(path='./')
-        default_ef = embedding_functions.DefaultEmbeddingFunction()
-        try:
-            collection = chroma_client.get_collection(name=collection_name, embedding_function= default_ef)
-            return False
-        except:
-            return True
 
 
 class LoadRagView(viewsets.ModelViewSet):
@@ -107,8 +100,8 @@ class LoadRagView(viewsets.ModelViewSet):
                 continue
             else:
                 self.create_collection_from_file(file)
-                
-        return Response({"response": "Collections have been created/updated!"})
+
+        return Response({"response": "Collections have been uploaded/updated"})
 
     def get_collection_name(self, filename):
         return re.sub(r'[^\w\s]', '', filename.replace(" ",""))
