@@ -16,23 +16,42 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from core.views import ChatbotView
-from core.views import LoadRagView
-from core.views import FileUploadView
-from core.views import FilesRetrievalView
-from core.views import chatWithEmbeddingsView
-from core.views import AskPurelyLlamaView
+from core.views.gemini.CachedContext import ChatbotView
+from core.views.gemini.CachedContext import LoadCacheView
+from core.views.llama.VectorizedContext import ChatbotView as LlamaChatBotView
+from core.views.llama.VectorizedContext import LoadCollectionsView
+from core.views.Files import FileUploadView
+from core.views.Files import FilesRetrievalView
 from rest_framework import routers
 from django.conf import settings
 from django.conf.urls.static import static
 
 router = routers.DefaultRouter()
-router.register(r'chat', ChatbotView, 'chat')
-router.register(r'rag', LoadRagView, 'init')
+
+"""
+URLs associated to RAG based on long-context caching
+    1. host/api/cached-context/chat
+    2. host/api/cached-context/generate-cache
+"""
+router.register(r'cached-context/chat', ChatbotView, 'geminichat')
+router.register(r'cached-context/refresh-cache', LoadCacheView, 'geminiload')
+
+"""
+URLs associated to RAG based on long-context caching
+    1. host/api/cached-context/chat
+    2. host/api/cached-context/generate-cache
+"""
+
+router.register(r'llama/vectorized-context/llama-chat', LlamaChatBotView, 'llamachat')
+router.register(r'llama/vectorized-context/load-collections', LoadCollectionsView, 'loadcollections')
+
+"""
+URLs associated to Files treatment
+"""
+
+router.register(r'get-files', FilesRetrievalView, 'files')
 router.register(r'file-upload', FileUploadView, 'fileupload')
-router.register(r'get-files', FilesRetrievalView, 'getfiles')
-router.register(r'chat-db', chatWithEmbeddingsView, 'chatchromadb')
-router.register(r'ask-llama', AskPurelyLlamaView, 'askLlama')
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
