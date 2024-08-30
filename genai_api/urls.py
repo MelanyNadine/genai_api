@@ -16,8 +16,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from core.views.gemini.CachedContext import ChatbotView
+from core.views.gemini.CachedContext import ChatbotView as GeminiChatBotView1
 from core.views.gemini.CachedContext import LoadCacheView
+from core.views.gemini.VectorizedContext import ChatbotView as GeminiChatBotView2
+from core.views.gemini.VectorizedContext import LoadCollectionsView as LoadGeminiCollectionsView
 from core.views.llama.VectorizedContext import ChatbotView as LlamaChatBotView
 from core.views.llama.VectorizedContext import LoadCollectionsView
 from core.views.Files import FileUploadView
@@ -33,8 +35,9 @@ URLs associated to RAG based on long-context caching
     1. host/api/cached-context/chat
     2. host/api/cached-context/generate-cache
 """
-router.register(r'cached-context/chat', ChatbotView, 'geminichat')
+router.register(r'cached-context/chat', GeminiChatBotView1, 'geminichat')
 router.register(r'cached-context/refresh-cache', LoadCacheView, 'geminiload')
+
 
 """
 URLs associated to RAG based on long-context caching
@@ -42,8 +45,11 @@ URLs associated to RAG based on long-context caching
     2. host/api/cached-context/generate-cache
 """
 
+router.register(r'gemini/vectorized-context/gemini-chat', GeminiChatBotView2, 'geminichat2')
+router.register(r'gemini/vectorized-context/load-gemini-collections', LoadGeminiCollectionsView, 'geminicollections')
+
 router.register(r'llama/vectorized-context/llama-chat', LlamaChatBotView, 'llamachat')
-router.register(r'llama/vectorized-context/load-collections', LoadCollectionsView, 'loadcollections')
+router.register(r'llama/vectorized-context/load-llama-collections', LoadCollectionsView, 'llamacollections')
 
 """
 URLs associated to Files treatment

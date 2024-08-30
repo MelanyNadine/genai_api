@@ -35,17 +35,29 @@ class ChatbotView(viewsets.ModelViewSet):
     serializer_class = QueriesSerializer
 
     def get_last_cache(self):
+        """
+        LAST CACHE RETRIEVAL
+
+        
+        """
+
         # If cache was set by LoadCacheView api calling, it's just returned
         if not CACHE_ID[0]:
             cached_content = caching.CachedContent.list()
             cache_data = [str(c) for c in cached_content]
             last_cache_from_stack = n = cache_data[0]
 
+            # Stringified CachedContent object has some properties, being the first name.
+            # Since it looks like <CachedContent(name='...') the characters to be considered
+            # are = and '.
+            name_start = lambda stringified_cache : stringified_cache.index('=') + 2
+            name_end = lambda stringified_cache : stringified_cache.index("'", name_start(n) + 3)
+
             # CachedContent objects in cache_data list are stringified and the last in -
             # first out is separated from its first property: name='cache id'
-            last_cache_id = last_cache_from_stack[(n.index('=')+2):(n.index("'", (n.index('='))+5))]
+            last_cache_id = last_cache_from_stack[name_start(n):name_end(n)]
             
-            # the memory spaced previously reserved is set
+            # the memory space previously reserved is set
             CACHE_ID[0] = last_cache_id
 
         return CACHE_ID[0]

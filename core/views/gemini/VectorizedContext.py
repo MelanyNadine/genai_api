@@ -7,8 +7,8 @@ from rest_framework.response import Response
 from rest_framework import viewsets
 from rest_framework import generics
 from rest_framework.decorators import api_view
-from core.serializers import FilesSerializer
-from core.models import Files
+from core.serializers import QueriesSerializer
+from core.models import Queries
 from pathlib import Path
 from core.forms import UploadFileForm
 import google.generativeai as genai
@@ -23,6 +23,7 @@ from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
 import io
 import re
 import os
+import time
 import itertools
 import transformers
 import torch
@@ -32,13 +33,20 @@ import datetime
 import base64
 from dotenv import load_dotenv
 
-CHROMA_CLIENT = chromadb.PersistentClient(path='./')
+CHROMA_CLIENT = chromadb.PersistentClient(path='./gemini_collections/')
 EMBEDDING_FUNCTION = embedding_functions.GoogleGenerativeAiEmbeddingFunction(
     api_key=os.environ.get('GOOGLE_API_KEY'), task_type="RETRIEVAL_QUERY"
 )
 
-def get_collection_name(self, filename):
+def get_collection_name(filename):
     return re.sub(r'[^\w\s]', '', filename.replace(" ",""))
+
+def collection_already_exists(collection_name):
+    try:
+        collection = CHROMA_CLIENT.get_collection(name=collection_name, embedding_function=EMBEDDING_FUNCTION)
+        return True
+    except:
+        return False
 
 class ChatbotView(viewsets.ModelViewSet):
     queryset = Queries.objects.all()
@@ -48,66 +56,66 @@ class ChatbotView(viewsets.ModelViewSet):
         genai.configure(api_key=os.environ.get('GOOGLE_API_KEY'))
 
         user_query = request.data.get('query')
-        info_source = ''
+        context = ''
         
         for file in os.listdir('./files'):
             filename = file.split('.')[0]
             collection_name = get_collection_name(filename)
-            try:
-                collection_name = get_collection_name(filename)
-            except:
-                continue
 
-            collection = CHROMA_CLIENT.get_collection(name=collection_name, embedding_function=EMBEDDING_FUNCTION)
-            info_source += collection.query(query_texts=[user_query], n_results=4, include=["documents", "metadatas"])
+            if collection_already_exists(collection_name):
+                collection = CHROMA_CLIENT.get_collection(name=collection_name, embedding_function=EMBEDDING_FUNCTION)
+                collection_query = collection.query(query_texts=[user_query], n_results=4, include=["documents", "metadatas"])
+                collection_best_response = collection_query['documents'][0][0]
+                context += f'''
+                    NEW INFO SOURCE: \n {filename} \n 
+                    RESPOND THE {user_query} WITH THIS: \n {collection_best_response} 
+                    which is the SOURCE INFORMATION \n
+                '''
+        
+        #return Response({"response": context})
         
         prompt = f'''You are an assistant bot that answers questions using text from the source information provided. 
             You are allowed to obtain information only from the source information here specified. Include in the 
             answer the name of the file from which you obtained the information. \
             QUESTION: {user_query}
-            SOURCE INFORMATION: {info_source}
+            SOURCE INFORMATION AND FURTHER INSTRUCTION: {context}
         '''
-
-        return Response({"response":[info_source, user_query]})
+        
         model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(user_query)
-                
-        return Response({"response":response.text})
 
-class LoadRagView(viewsets.ModelViewSet):
+        start_time = time.time() 
+        response = model.generate_content(user_query)
+        end_time = time.time()
+
+        response_entry = {
+            "query": user_query,
+            "context": context, 
+            "response": response.text, 
+            "response_time": end_time - start_time   
+        }
+                
+        return Response(response_entry)
+
+class LoadCollectionsView(viewsets.ModelViewSet):
     queryset = Queries.objects.all()
     serializer_class = QueriesSerializer
 
     def list(self, request):            
 
-        info_source = ''
+        collections = []
         
         for file in os.listdir('./files'):
             filename = file.split('.')[0]
             collection_name = get_collection_name(filename)
         
-        
-            if self.collection_already_exists(collection_name):
+            if collection_already_exists(collection_name):
+                CHROMA_CLIENT.delete_collection(name=collection_name)
+                collections.append(collection_name)
                 continue
             else:
                 self.create_collection_from_file(file)
 
-            collection = CHROMA_CLIENT.get_collection(name=collection_name, embedding_function=EMBEDDING_FUNCTION)
-            collection_documents = collection.get()['documents']
-            collection_text = '*NEW_DOC*'.join(collection_documents)
-                
-            if collection_text:
-                info_source  += f'DOCUMENT TITLE: {file} \n DOCUMENT CONTENT: {collection_text}\n'
-
-        return Response({"response":collection_name})
-        
-    
-    def collection_already_exists(self, collection_name):
-        try:
-            collection = CHROMA_CLIENT.get_collection(name=collection_name, embedding_function=EMBEDDING_FUNCTION)
-            return True
-        except:
-            return False
+        return Response({"collections":collections})
         
     def create_collection_from_file(self, file):
 
@@ -116,22 +124,20 @@ class LoadRagView(viewsets.ModelViewSet):
         collection_name = get_collection_name(filename)
         collection_text = ""
 
-        if file_ext=='pdf':
+        if file_ext=='pdf' and filename == 'Principal Routine Maintenance Procedures':
             pdf_file = PdfReader('./files/'+file)
             for page in pdf_file.pages:
                 collection_text += page.extract_text()
 
-        splitted_text = re.split('\n \n', collection_text)
-        chuncked_text = [textline for textline in splitted_text if textline != "" or textline != " "]
+        if collection_text:
+            splitted_text = re.split('\n \n', collection_text)
+            chuncked_text = [textline for textline in splitted_text if textline != "" or textline != " "]
 
-        if chuncked_text:
-            collection = CHROMA_CLIENT.create_collection(name=collection_name, embedding_function=EMBEDDING_FUNCTION)
-            
-            for i, textline in enumerate(chuncked_text):
-                try:
-                    collection.add(documents=textline, ids=str(i)) 
-                except:
-                    break
+            if chuncked_text:
+                collection = CHROMA_CLIENT.create_collection(name=collection_name, embedding_function=EMBEDDING_FUNCTION)
+                
+                for i, textline in enumerate(chuncked_text):
+                    collection.add(documents=textline, ids=str(i))        
 
     def get_pdf_by_url(self, url):
         remote_file = urlopen(url).read()
