@@ -64,21 +64,18 @@ class ChatbotView(viewsets.ModelViewSet):
 
             if collection_already_exists(collection_name):
                 collection = CHROMA_CLIENT.get_collection(name=collection_name, embedding_function=EMBEDDING_FUNCTION)
-                collection_query = collection.query(query_texts=[user_query], n_results=4, include=["documents", "metadatas"])
+                collection_query = collection.query(query_texts=[user_query], n_results=2, include=["documents", "metadatas"])
                 collection_best_response = collection_query['documents'][0][0]
                 context += f'''
                     NEW INFO SOURCE: \n {filename} \n 
-                    RESPOND THE {user_query} WITH THIS: \n {collection_best_response} 
-                    which is the SOURCE INFORMATION \n
+                    NEW CONTEXT FROM INFO SOURCE TO ANSWER TO {user_query}: {collection_best_response}\n
                 '''
-        
-        #return Response({"response": context})
-        
+
         prompt = f'''You are an assistant bot that answers questions using text from the source information provided. 
             You are allowed to obtain information only from the source information here specified. Include in the 
             answer the name of the file from which you obtained the information. \
             QUESTION: {user_query}
-            SOURCE INFORMATION AND FURTHER INSTRUCTION: {context}
+            SOURCE INFORMATION AND FURTHER INSTRUCTIONS: {context}
         '''
         
         model = genai.GenerativeModel('gemini-1.5-flash')

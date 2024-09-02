@@ -19,6 +19,7 @@ from urllib.request import urlopen
 import io
 import re
 import os
+import time
 from google.generativeai import caching
 import datetime
 import base64
@@ -72,9 +73,18 @@ class ChatbotView(viewsets.ModelViewSet):
             return Response({"response": "Cache has expired. Reload it!"})
 
         model = genai.GenerativeModel.from_cached_content(cached_content=cached_context)
+
+        start_time = time.time() 
         response = model.generate_content(user_query)
+        end_time = time.time()
+
+        response_entry = {
+            "query": user_query,
+            "response": response.text, 
+            "response_time": end_time - start_time   
+        }
                 
-        return Response({"response":response.text})
+        return Response(response_entry)
 
 class LoadCacheView(viewsets.ModelViewSet):
     queryset = Queries.objects.all()
