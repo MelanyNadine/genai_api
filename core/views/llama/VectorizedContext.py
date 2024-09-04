@@ -31,20 +31,45 @@ import datetime
 import base64
 from dotenv import load_dotenv
 
+"""
 
-CHROMA_CLIENT = chromadb.PersistentClient(path='./')
+"""
 
-EMBEDDING_FUNCTION = embedding_functions.HuggingFaceEmbeddingFunction(
+
+CHROMA_CLIENT = chromadb.PersistentClient(path='./llama_collections/')
+
+""" Options for Embedding Functions
+
+1. Hugging Face Embedding Function
+2. Sentence Transformer Embedding Function (Default)
+"""
+HUGGINGFACE_EF = embedding_functions.HuggingFaceEmbeddingFunction(
     api_key="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",
     model_name="meta-llama/Meta-Llama-3.1-8B"
 )
 
 DEFAULT_EF = embedding_functions.DefaultEmbeddingFunction()
 
+""" Embedding Function setting
+
+This Embedding function is used to create the vector store. It's used in both classes
+here defined.
+"""
+
+EMBEDDING_FUNCTION = DEFAULT_EF
+
 FILES_DIR = './files'
 
+#Removes all the special characters in the filename later to become the collection name
 def get_collection_name(filename):
         return re.sub(r'[^\w\s]', '', filename.replace(" ",""))
+
+def collection_already_exists(collection_name):
+    try:
+        collection = CHROMA_CLIENT.get_collection(name=collection_name, embedding_function=EMBEDDING_FUNCTION)
+        return True
+    except:
+        return False
 
 class ChatbotView(viewsets.ModelViewSet):
     queryset = Queries.objects.all()
@@ -58,13 +83,13 @@ class ChatbotView(viewsets.ModelViewSet):
         for file in os.listdir(FILES_DIR):
             filename = file.split('.')[0]
             collection_name = get_collection_name(filename)
-            collection = CHROMA_CLIENT.get_collection(name=collection_name, embedding_function=DEFAULT_EF)
+            collection = CHROMA_CLIENT.get_collection(name=collection_name, embedding_function=EMBEDDING_FUNCTION)
             collection_query = collection.query(query_texts=[user_query], n_results=5)
             context += str(collection_query)
 
         
         parent = os.path.dirname(os.getcwd())
-        model_path = "C:\\Users\\mmonroy\\Documents\\Projects\\CarozziDemoApp\\genai_api\\models\\Meta-Llama3.1-8B" 
+        model_path = "C:\\Users\\mmonroy\\Documents\\Projects\\CarozziDemoApp\\Meta-Llama3.1-8B" 
         
         model = LlamaForCausalLM.from_pretrained(
             model_path,
@@ -118,20 +143,13 @@ class LoadCollectionsView(viewsets.ModelViewSet):
             filename = file.split('.')[0]
             collection_name = get_collection_name(filename)
             
-            if self.collection_already_exists(collection_name):
+            if collection_already_exists(collection_name):
                 collections.append(collection_name)
                 continue
             else:
                 self.create_collection_from_file(file)
 
         return Response({"collections":collections})
-
-    def collection_already_exists(self, collection_name):
-        try:
-            collection = CHROMA_CLIENT.get_collection(name=collection_name, embedding_function=DEFAULT_EF)
-            return True
-        except:
-            return False
         
     def create_collection_from_file(self, file):
 
@@ -145,12 +163,12 @@ class LoadCollectionsView(viewsets.ModelViewSet):
             for page in pdf_file.pages:
                 pdf_text += page.extract_text()
 
-        splitted_text = re.split('\n \n', pdf_text)
+        splitted_text = pdf_text.split('\n')
 
         chuncked_text = [textline for textline in splitted_text if textline != "" or textline != " "]
         
         if chuncked_text:
-            collection = CHROMA_CLIENT.create_collection(name=collection_name, embedding_function=DEFAULT_EF)
+            collection = CHROMA_CLIENT.create_collection(name=collection_name, embedding_function=EMBEDDING_FUNCTION)
 
             for i,textline in enumerate(chuncked_text):
                 collection.add(documents=textline, ids=str(i))        

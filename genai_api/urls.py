@@ -35,8 +35,8 @@ URLs associated to RAG based on long-context caching
     1. host/api/cached-context/chat
     2. host/api/cached-context/generate-cache
 """
-router.register(r'cached-context/chat', GeminiChatBotView1, 'geminichat')
-router.register(r'cached-context/refresh-cache', LoadCacheView, 'geminiload')
+router.register(r'gemini/cached-context/gemini-chat', GeminiChatBotView1, 'geminichat')
+router.register(r'gemini/cached-context/refresh-cache', LoadCacheView, 'geminiload')
 
 
 """
@@ -48,8 +48,8 @@ URLs associated to RAG based on long-context caching
 router.register(r'gemini/vectorized-context/gemini-chat', GeminiChatBotView2, 'geminichat2')
 router.register(r'gemini/vectorized-context/load-gemini-collections', LoadGeminiCollectionsView, 'geminicollections')
 
-router.register(r'llama/vectorized-context/llama-chat', LlamaChatBotView, 'llamachat')
-router.register(r'llama/vectorized-context/load-llama-collections', LoadCollectionsView, 'llamacollections')
+#router.register(r'llama/vectorized-context/llama-chat', LlamaChatBotView, 'llamachat')
+#router.register(r'llama/vectorized-context/load-llama-collections', LoadCollectionsView, 'llamacollections')
 
 """
 URLs associated to Files treatment

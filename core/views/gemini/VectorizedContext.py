@@ -32,6 +32,7 @@ from google.generativeai import caching
 import datetime
 import base64
 from dotenv import load_dotenv
+import math
 
 CHROMA_CLIENT = chromadb.PersistentClient(path='./gemini_collections/')
 EMBEDDING_FUNCTION = embedding_functions.GoogleGenerativeAiEmbeddingFunction(
@@ -51,31 +52,6 @@ def collection_already_exists(collection_name):
 class ChatbotView(viewsets.ModelViewSet):
     queryset = Queries.objects.all()
     serializer_class = QueriesSerializer
-
-    def list(self, request):
-
-        collection_text = ''
-        size_counter = 0
-        test = []
-
-        for file in os.listdir('./files/'):
-            filename = file.split('.')[0]
-            file_ext = file.split('.')[1]
-            if file_ext=='pdf':
-                pdf_file = PdfReader('./files/'+file)
-                for page in pdf_file.pages:
-                    collection_text += page.extract_text()
-
-            if collection_text:
-                splitted_text = re.split('\n \n', collection_text)
-                chuncked_text = [textline for textline in splitted_text if textline != "" or textline != " "]
-
-            for i, textline in enumerate(chuncked_text):
-                size = len(textline.encode("utf-8"))
-                size_counter += size
-                test.append([i, textline, size, len(textline)])  
-
-        return Response({'test':test, 'size':size_counter})
 
     def create(self,request):
         genai.configure(api_key=os.environ.get('GOOGLE_API_KEY'))
@@ -133,13 +109,12 @@ class LoadCollectionsView(viewsets.ModelViewSet):
             collection_name = get_collection_name(filename)
         
             if collection_already_exists(collection_name):
-                CHROMA_CLIENT.delete_collection(name=collection_name)
                 collections.append(collection_name)
                 continue
             else:
                 self.create_collection_from_file(file)
 
-        return Response({"collections":collections, "sizes": self.sizes})
+        return Response({"collections":collections})
         
     def create_collection_from_file(self, file):
 
@@ -154,22 +129,37 @@ class LoadCollectionsView(viewsets.ModelViewSet):
                 collection_text += page.extract_text()
 
         if collection_text:
-            splitted_text = re.split('\n \n', collection_text)
-            chuncked_text = [textline for textline in splitted_text if textline != "" or textline != " "]
+            chuncked_text = self.separate_text(collection_text)
 
             collection = CHROMA_CLIENT.create_collection(name=collection_name, embedding_function=EMBEDDING_FUNCTION)
                 
             for i, textline in enumerate(chuncked_text):
-                try:
-                    collection.add(documents=textline, ids=str(i))        
-                    self.sizes.append({'success': len(textline.encode("utf-8"))})
-                except:
-                    self.sizes.append({'failure': len(textline.encode("utf-8"))})
+                collection.add(documents=textline, ids=str(i))        
 
     def get_pdf_by_url(self, url):
         remote_file = urlopen(url).read()
         memory_file = io.BytesIO(remote_file)
         return memory_file
+
+    def separate_text(self, text):
+        lower_bound = 9300
+        step = 9500
+        start = 0
+        chuncked_text = []
+        chunks_num = math.floor(len(text)/step)
+    
+        for i in range(chunks_num):
+            stop = text.find(" ", lower_bound)
+            limited_textline = text[start:stop]
+
+            if not limited_textline:
+                continue
+
+            chuncked_text.append(limited_textline)
+            start = stop
+            lower_bound += step
+
+        return chuncked_text
 
 
 
